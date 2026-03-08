@@ -1,386 +1,313 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-<title>Ultimate Microbiology Simulator</title>
+  <head>
+    <title>Ultimate Microbiology Simulator</title>
 
-<style>
-
-body{
-background:#111;
-color:white;
-font-family:sans-serif;
-text-align:center;
-}
-
-canvas{
-background:#000;
-border:2px solid #444;
-cursor:crosshair;
-}
-
-button{
-padding:8px;
-margin:3px;
-background:#333;
-color:white;
-border:none;
-}
-
-button:hover{
-background:#555;
-}
-
-#panel{
-margin:10px;
-}
-
-</style>
-</head>
-
-<body>
-
-<h2>🧬 Ultimate Microbiology Simulator</h2>
-
-<div id="panel">
-
-<button onclick="setTool('cell')">Cell</button>
-<button onclick="setTool('bacteria')">Bacteria</button>
-<button onclick="setTool('virus')">Virus</button>
-<button onclick="setTool('food')">Food</button>
-<button onclick="clearWorld()">Clear</button>
-
-<br><br>
-
-Temperature
-<input id="temp" type="range" min="0" max="100" value="50">
-
-</div>
-
-<canvas id="world" width="1000" height="600"></canvas>
-
-<p id="stats"></p>
-
-<script>
-
-const canvas=document.getElementById("world")
-const ctx=canvas.getContext("2d")
-
-let tool="cell"
-
-function setTool(t){tool=t}
-
-let microbes=[]
-let foods=[]
-
-let camera={x:0,y:0,zoom:1}
-
-class Microbe{
-
-constructor(x,y,type){
-
-this.x=x
-this.y=y
-this.type=type
-
-this.energy=100
-
-this.vx=Math.random()*2-1
-this.vy=Math.random()*2-1
-
-this.mutation=Math.random()*0.5
-
-this.birth=Date.now()
-
-this.infected=false
-
-}
-
-move(){
-
-this.vx+=(Math.random()-0.5)*0.4
-this.vy+=(Math.random()-0.5)*0.4
-
-this.x+=this.vx
-this.y+=this.vy
-
-}
-
-eat(){
-
-foods.forEach((f,i)=>{
-
-let dx=this.x-f.x
-let dy=this.y-f.y
-
-if(Math.sqrt(dx*dx+dy*dy)<6){
-
-this.energy+=40
-foods.splice(i,1)
-
-}
-
-})
-
-}
-
-divide(){
-
-if(this.type=="cell"){
-
-if(Date.now()-this.birth>5000){
-
-this.birth=Date.now()
-
-microbes.push(new Microbe(
-this.x+Math.random()*10-5,
-this.y+Math.random()*10-5,
-"cell"
-))
-
-}
-
-}
-
-}
-
-reproduce(){
-
-let temp=document.getElementById("temp").value
-
-let rate=0.001+(temp/40000)
-
-if(this.type=="bacteria" && this.energy>120){
-
-if(Math.random()<rate){
-
-this.energy=60
-
-let child=new Microbe(this.x,this.y,"bacteria")
-
-child.mutation=this.mutation+(Math.random()-0.5)*0.1
-
-microbes.push(child)
-
-}
-
-}
-
-}
-
-virusLogic(){
-
-if(this.type!="virus") return
-
-microbes.forEach(m=>{
-
-if(m.type=="cell" && !m.infected){
-
-let dx=this.x-m.x
-let dy=this.y-m.y
-
-if(Math.sqrt(dx*dx+dy*dy)<8){
-
-m.infected=true
-
-}
-
-}
-
-})
-
-}
-
-burst(){
-
-if(this.infected){
-
-if(Math.random()<0.002){
-
-this.infected=false
-
-for(let i=0;i<3;i++){
-
-microbes.push(new Microbe(
-this.x+Math.random()*6,
-this.y+Math.random()*6,
-"virus"
-))
-
-}
-
-}
-
-}
-
-}
-
-update(){
-
-this.move()
-
-if(this.type=="bacteria"){
-
-this.eat()
-this.reproduce()
-
-}
-
-this.divide()
-
-this.virusLogic()
-
-this.burst()
-
-this.energy-=0.1
-
-}
-
-draw(){
-
-let size=6
-
-if(this.type=="cell") ctx.fillStyle="green"
-if(this.type=="bacteria") ctx.fillStyle="yellow"
-if(this.type=="virus") ctx.fillStyle="red"
-
-if(this.infected) ctx.fillStyle="purple"
-
-ctx.beginPath()
-ctx.arc(
-(this.x-camera.x)*camera.zoom,
-(this.y-camera.y)*camera.zoom,
-size*camera.zoom,
-0,
-Math.PI*2
-)
-
-ctx.fill()
-
-}
-
-}
-
-class Food{
-
-constructor(x,y){
-
-this.x=x
-this.y=y
-
-}
-
-draw(){
-
-ctx.fillStyle="cyan"
-
-ctx.beginPath()
-
-ctx.arc(
-(this.x-camera.x)*camera.zoom,
-(this.y-camera.y)*camera.zoom,
-3*camera.zoom,
-0,
-Math.PI*2
-)
-
-ctx.fill()
-
-}
-
-}
-
-canvas.addEventListener("click",e=>{
-
-let rect=canvas.getBoundingClientRect()
-
-let x=(e.clientX-rect.left)/camera.zoom+camera.x
-let y=(e.clientY-rect.top)/camera.zoom+camera.y
-
-if(tool=="food"){
-
-foods.push(new Food(x,y))
-
-}else{
-
-microbes.push(new Microbe(x,y,tool))
-
-}
-
-})
-
-canvas.addEventListener("wheel",e=>{
-
-camera.zoom*=e.deltaY>0?0.9:1.1
-
-})
-
-window.addEventListener("keydown",e=>{
-
-if(e.key=="ArrowUp")camera.y-=20
-if(e.key=="ArrowDown")camera.y+=20
-if(e.key=="ArrowLeft")camera.x-=20
-if(e.key=="ArrowRight")camera.x+=20
-
-})
-
-function update(){
-
-ctx.clearRect(0,0,canvas.width,canvas.height)
-
-microbes.forEach((m,i)=>{
-
-m.update()
-m.draw()
-
-if(m.energy<=0){
-
-microbes.splice(i,1)
-
-}
-
-})
-
-foods.forEach(f=>f.draw())
-
-updateStats()
-
-requestAnimationFrame(update)
-
-}
-
-function updateStats(){
-
-let cell=0
-let bac=0
-let vir=0
-
-microbes.forEach(m=>{
-
-if(m.type=="cell")cell++
-if(m.type=="bacteria")bac++
-if(m.type=="virus")vir++
-
-})
-
-document.getElementById("stats").innerText=
-
-"Cells: "+cell+
-" | Bacteria: "+bac+
-" | Viruses: "+vir+
-" | Food: "+foods.length
-
-}
-
-function clearWorld(){
-
-microbes=[]
-foods=[]
-
-}
-
-update()
-
-</script>
-
-</body>
+    <style>
+      body {
+        background: #111;
+        color: white;
+        font-family: sans-serif;
+        text-align: center;
+      }
+
+      canvas {
+        background: #000;
+        border: 2px solid #444;
+        cursor: crosshair;
+      }
+
+      button {
+        padding: 8px;
+        margin: 3px;
+        background: #333;
+        color: white;
+        border: none;
+      }
+
+      button:hover {
+        background: #555;
+      }
+
+      #panel {
+        margin: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>🧬 Ultimate Microbiology Simulator</h2>
+
+    <div id="panel">
+      <button onclick="setTool('cell')">Cell</button>
+      <button onclick="setTool('bacteria')">Bacteria</button>
+      <button onclick="setTool('virus')">Virus</button>
+      <button onclick="setTool('food')">Food</button>
+      <button onclick="clearWorld()">Clear</button>
+
+      <br /><br />
+
+      Temperature
+      <input id="temp" type="range" min="0" max="100" value="50" />
+    </div>
+
+    <canvas id="world" width="1000" height="600"></canvas>
+
+    <p id="stats"></p>
+
+    <script>
+      const canvas = document.getElementById("world");
+      const ctx = canvas.getContext("2d");
+
+      let tool = "cell";
+
+      function setTool(t) {
+        tool = t;
+      }
+
+      let microbes = [];
+      let foods = [];
+
+      let camera = { x: 0, y: 0, zoom: 1 };
+
+      class Microbe {
+        constructor(x, y, type) {
+          this.x = x;
+          this.y = y;
+          this.type = type;
+
+          this.energy = 100;
+
+          this.vx = Math.random() * 2 - 1;
+          this.vy = Math.random() * 2 - 1;
+
+          this.mutation = Math.random() * 0.5;
+
+          this.birth = Date.now();
+
+          this.infected = false;
+        }
+
+        move() {
+          this.vx += (Math.random() - 0.5) * 0.4;
+          this.vy += (Math.random() - 0.5) * 0.4;
+
+          this.x += this.vx;
+          this.y += this.vy;
+        }
+
+        eat() {
+          foods.forEach((f, i) => {
+            let dx = this.x - f.x;
+            let dy = this.y - f.y;
+
+            if (Math.sqrt(dx * dx + dy * dy) < 6) {
+              this.energy += 40;
+              foods.splice(i, 1);
+            }
+          });
+        }
+
+        divide() {
+          if (this.type == "cell") {
+            if (Date.now() - this.birth > 5000) {
+              this.birth = Date.now();
+
+              microbes.push(
+                new Microbe(
+                  this.x + Math.random() * 10 - 5,
+                  this.y + Math.random() * 10 - 5,
+                  "cell",
+                ),
+              );
+            }
+          }
+        }
+
+        reproduce() {
+          let temp = document.getElementById("temp").value;
+
+          let rate = 0.001 + temp / 40000;
+
+          if (this.type == "bacteria" && this.energy > 120) {
+            if (Math.random() < rate) {
+              this.energy = 60;
+
+              let child = new Microbe(this.x, this.y, "bacteria");
+
+              child.mutation = this.mutation + (Math.random() - 0.5) * 0.1;
+
+              microbes.push(child);
+            }
+          }
+        }
+
+        virusLogic() {
+          if (this.type != "virus") return;
+
+          microbes.forEach((m) => {
+            if (m.type == "cell" && !m.infected) {
+              let dx = this.x - m.x;
+              let dy = this.y - m.y;
+
+              if (Math.sqrt(dx * dx + dy * dy) < 8) {
+                m.infected = true;
+              }
+            }
+          });
+        }
+
+        burst() {
+          if (this.infected) {
+            if (Math.random() < 0.002) {
+              this.infected = false;
+
+              for (let i = 0; i < 3; i++) {
+                microbes.push(
+                  new Microbe(
+                    this.x + Math.random() * 6,
+                    this.y + Math.random() * 6,
+                    "virus",
+                  ),
+                );
+              }
+            }
+          }
+        }
+
+        update() {
+          this.move();
+
+          if (this.type == "bacteria") {
+            this.eat();
+            this.reproduce();
+          }
+
+          this.divide();
+
+          this.virusLogic();
+
+          this.burst();
+
+          this.energy -= 0.1;
+        }
+
+        draw() {
+          let size = 6;
+
+          if (this.type == "cell") ctx.fillStyle = "green";
+          if (this.type == "bacteria") ctx.fillStyle = "yellow";
+          if (this.type == "virus") ctx.fillStyle = "red";
+
+          if (this.infected) ctx.fillStyle = "purple";
+
+          ctx.beginPath();
+          ctx.arc(
+            (this.x - camera.x) * camera.zoom,
+            (this.y - camera.y) * camera.zoom,
+            size * camera.zoom,
+            0,
+            Math.PI * 2,
+          );
+
+          ctx.fill();
+        }
+      }
+
+      class Food {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+        }
+
+        draw() {
+          ctx.fillStyle = "cyan";
+
+          ctx.beginPath();
+
+          ctx.arc(
+            (this.x - camera.x) * camera.zoom,
+            (this.y - camera.y) * camera.zoom,
+            3 * camera.zoom,
+            0,
+            Math.PI * 2,
+          );
+
+          ctx.fill();
+        }
+      }
+
+      canvas.addEventListener("click", (e) => {
+        let rect = canvas.getBoundingClientRect();
+
+        let x = (e.clientX - rect.left) / camera.zoom + camera.x;
+        let y = (e.clientY - rect.top) / camera.zoom + camera.y;
+
+        if (tool == "food") {
+          foods.push(new Food(x, y));
+        } else {
+          microbes.push(new Microbe(x, y, tool));
+        }
+      });
+
+      canvas.addEventListener("wheel", (e) => {
+        camera.zoom *= e.deltaY > 0 ? 0.9 : 1.1;
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key == "ArrowUp") camera.y -= 20;
+        if (e.key == "ArrowDown") camera.y += 20;
+        if (e.key == "ArrowLeft") camera.x -= 20;
+        if (e.key == "ArrowRight") camera.x += 20;
+      });
+
+      function update() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        microbes.forEach((m, i) => {
+          m.update();
+          m.draw();
+
+          if (m.energy <= 0) {
+            microbes.splice(i, 1);
+          }
+        });
+
+        foods.forEach((f) => f.draw());
+
+        updateStats();
+
+        requestAnimationFrame(update);
+      }
+
+      function updateStats() {
+        let cell = 0;
+        let bac = 0;
+        let vir = 0;
+
+        microbes.forEach((m) => {
+          if (m.type == "cell") cell++;
+          if (m.type == "bacteria") bac++;
+          if (m.type == "virus") vir++;
+        });
+
+        document.getElementById("stats").innerText =
+          "Cells: " +
+          cell +
+          " | Bacteria: " +
+          bac +
+          " | Viruses: " +
+          vir +
+          " | Food: " +
+          foods.length;
+      }
+
+      function clearWorld() {
+        microbes = [];
+        foods = [];
+      }
+
+      update();
+    </script>
+  </body>
 </html>
